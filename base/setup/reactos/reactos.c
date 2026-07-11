@@ -22,7 +22,6 @@
 
 HANDLE ProcessHeap;
 SETUPDATA SetupData;
-static BOOLEAN IsUnattendedSetup;
 
 /* The partition where to perform the installation */
 PPARTENTRY InstallPartition = NULL;
@@ -462,6 +461,9 @@ TypeDlgProc(
                 EnableDlgItem(hwndDlg, IDC_UPDATE, FALSE);
                 EnableDlgItem(hwndDlg, IDC_UPDATETEXT, FALSE);
             }
+
+            // TODO: Consider handling existing install upgrade in unattended mode
+            // (currently unsupported in text-mode setup also).
 
             /* Ensure "Install ReactOS" is initially focused */
             SetFocus(GetDlgItem(hwndDlg, IDC_INSTALL));
@@ -1012,6 +1014,9 @@ DeviceDlgProc(
             // hList = GetDlgItem(hwndDlg, IDC_KEYBOARD_LAYOUT);
             // InitGenericComboList(hList, pSetupData->USetupData.LayoutList, GetSettingDescription);
 
+            // TODO: Consider doing here the list selections in unattended mode
+            // (for now they are done in LoadSetupData()).
+
             return TRUE;
         }
 
@@ -1022,8 +1027,25 @@ DeviceDlgProc(
             switch (lpnm->code)
             {
                 case PSN_SETACTIVE:
-                    PropSheet_SetWizButtons(GetParent(hwndDlg), PSWIZB_BACK | PSWIZB_NEXT);
+                {
+                    /* In unattended mode, don't allow going backwards further, i.e.
+                     * back to the Upgrade/Repair, the Install type, or the Start pages,
+                     * in case the setup is interrupted and the user manually goes back. */
+                    if (pSetupData->bUnattend)
+                        PropSheet_SetWizButtons(GetParent(hwndDlg), PSWIZB_NEXT);
+                    else
+                        PropSheet_SetWizButtons(GetParent(hwndDlg), PSWIZB_BACK | PSWIZB_NEXT);
+
+                    /* In unattended mode, switch directly to the next page.
+                     * TODO: *UNLESS* there are inconsistencies in the data,
+                     * in which case we should stay on the page! */
+                    if (pSetupData->bUnattend)
+                    {
+                        SetWindowLongPtrW(hwndDlg, DWLP_MSGRESULT, -1);
+                        return TRUE;
+                    }
                     break;
+                }
 
                 case PSN_QUERYCANCEL:
                 {
@@ -1130,6 +1152,13 @@ SummaryDlgProc(
                     WCHAR CurrentItemText[256];
 
                     ASSERT(InstallPartition);
+
+                    /* Skip the Summary page in unattended setup */
+                    if (pSetupData->bUnattend)
+                    {
+                        SetWindowLongPtrW(hwndDlg, DWLP_MSGRESULT, -1);
+                        return TRUE;
+                    }
 
                     /* Show the current selected settings */
 
@@ -1425,15 +1454,9 @@ FsVolCallback(
     {
         if ((FSVOL_OP)Param1 == FSVOL_FORMAT)
         {
-            /*
-             * In case we just repair an existing installation, or make
-             * an unattended setup without formatting, just go to the
-             * filesystem check step.
-             */
+            /* In case we just repair an existing installation,
+             * just go to the file system check step */
             if (FsVolContext->pSetupData->RepairUpdateFlag)
-                return FSVOL_SKIP; /** HACK!! **/
-
-            if (IsUnattendedSetup && !FsVolContext->pSetupData->USetupData.FormatPartition)
                 return FSVOL_SKIP; /** HACK!! **/
 
             /* Set status text */
@@ -2670,6 +2693,10 @@ FinishDlgProc(
             return TRUE;
         }
 
+        case WM_APP: // TODO: Change name
+            PropSheet_PressButton(GetParent(hwndDlg), wParam);
+            break;
+
         case WM_ACTIVATE:
         {
             /* Only care about (de)activation only if we must reboot */
@@ -2741,6 +2768,18 @@ FinishDlgProc(
                     SetWindowResTextW(GetDlgItem(hWndParent, ID_WIZFINISH),
                                       pSetupData->hInstance,
                                       IDS_RESTARTBTN);
+
+                    /* Skip the Finish page in unattended setup */
+                    // TODO: But show the Abort page in case something happened?
+                    // TODO: Check the unattend.inf "WaitForReboot" value.
+                    if (pSetupData->bUnattend /*&& !pSetupData->bStopInstall*/)
+                    {
+                        PostMessageW(hwndDlg, WM_APP, PSBTN_FINISH, 0);
+                        /* We need to "stay" on the page so that we can
+                         * receive the PSN_WIZFINISH notification */
+                        SetWindowLongPtrW(hwndDlg, DWLP_MSGRESULT, 0);
+                        return TRUE;
+                    }
 
                     if (pSetupData->bMustReboot)
                     {
@@ -2835,7 +2874,7 @@ BOOL LoadSetupData(
 
     /* If not unattended, overwrite language and locale with
      * the current ones of the running ReactOS instance */
-    if (!IsUnattendedSetup)
+    if (!pSetupData->bUnattend)
     {
         LCID LocaleID = GetUserDefaultLCID();
 
@@ -2859,7 +2898,7 @@ BOOL LoadSetupData(
 
     /* If not unattended, overwrite keyboard layout with
      * the current one of the running ReactOS instance */
-    if (!IsUnattendedSetup)
+    if (!pSetupData->bUnattend)
     {
         C_ASSERT(_countof(pSetupData->DefaultKBLayout) >= KL_NAMELENGTH);
         /* If the call fails, keep the default already stored in the buffer */
@@ -3511,6 +3550,13 @@ static const struct
     DLGPROC pfnDlgProc;
 } WizardPages[] =
 {
+    /*
+     * These pages are useful only in the interactive installation scenario.
+     * In ReactOS unattended setup, we directly perform a new installation,
+     * possibly erasing any old one, but no upgrades.
+     * NOTE: This may be subject to changes in the future.
+     */
+
     /* Start page */
     {FALSE, PSP_HIDEHEADER,
      MAKEINTRESOURCEW(IDD_STARTPAGE), NULL, NULL, StartDlgProc},
@@ -3527,20 +3573,24 @@ static const struct
      MAKEINTRESOURCEW(IDS_UPDATETITLE), MAKEINTRESOURCEW(IDS_UPDATESUBTITLE),
      UpgradeRepairDlgProc},
 
+    /*
+     * These pages are common to both interactive and unattended setup scenarios.
+     */
+
     /* Device Settings page */
-    {FALSE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
+    {TRUE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
      MAKEINTRESOURCEW(IDD_DEVICEPAGE),
      MAKEINTRESOURCEW(IDS_DEVICETITLE), MAKEINTRESOURCEW(IDS_DEVICESUBTITLE),
      DeviceDlgProc},
 
     /* Install device settings page / boot method / install directory */
-    {FALSE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
+    {TRUE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
      MAKEINTRESOURCEW(IDD_DRIVEPAGE),
      MAKEINTRESOURCEW(IDS_DRIVETITLE), MAKEINTRESOURCEW(IDS_DRIVESUBTITLE),
      DriveDlgProc},
 
     /* Summary page */
-    {FALSE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
+    {TRUE, PSP_USEHEADERTITLE | PSP_USEHEADERSUBTITLE,
      MAKEINTRESOURCEW(IDD_SUMMARYPAGE),
      MAKEINTRESOURCEW(IDS_SUMMARYTITLE), MAKEINTRESOURCEW(IDS_SUMMARYSUBTITLE),
      SummaryDlgProc},
@@ -3605,7 +3655,7 @@ _tWinMain(HINSTANCE hInst,
     }
 
     /* Retrieve any supplemental options from the unattend file */
-    SetupData.bUnattend = IsUnattendedSetup = CheckUnattendedSetup(&SetupData.USetupData);
+    SetupData.bUnattend = CheckUnattendedSetup(&SetupData.USetupData);
 
     /* Load extra setup data (HW lists etc...) */
     if (!LoadSetupData(&SetupData))
