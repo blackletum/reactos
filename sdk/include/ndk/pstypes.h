@@ -46,11 +46,6 @@ extern POBJECT_TYPE NTSYSAPI PsJobType;
 #endif // !NTOS_MODE_USER
 
 //
-// KUSER_SHARED_DATA location in User Mode
-//
-#define USER_SHARED_DATA                        (0x7FFE0000)
-
-//
 // Global Flags
 //
 #define FLG_STOP_ON_EXCEPTION                   0x00000001
@@ -540,11 +535,10 @@ typedef enum _PSW32THREADCALLOUTTYPE
 } PSW32THREADCALLOUTTYPE;
 
 //
-// Declare empty structure definitions so that they may be referenced by
-// routines before they are defined
+// Declare empty structure definitions so that they may be
+// referenced by routines before they are defined.
 //
-struct _W32THREAD;
-struct _W32PROCESS;
+//struct _EPROCESS;
 //struct _ETHREAD;
 struct _WIN32_POWEREVENT_PARAMETERS;
 struct _WIN32_POWERSTATE_PARAMETERS;
@@ -1341,6 +1335,11 @@ typedef struct _ETHREAD
     KSEMAPHORE AlpcWaitSemaphore;
     ULONG CacheManagerCount;
 #endif
+    // TODO: Missing Vista+ members
+#if (NTDDI_VERSION >= NTDDI_WIN10_RS1) || defined(__REACTOS__)
+    PUNICODE_STRING ThreadName;
+    // TODO: Missing Win10+ members
+#endif
 } ETHREAD;
 
 //
@@ -1546,7 +1545,6 @@ typedef struct _EPROCESS
 //
 // Job Token Filter Data
 //
-#include <pshpack1.h>
 typedef struct _PS_JOB_TOKEN_FILTER
 {
     ULONG CapturedSidCount;
@@ -1617,7 +1615,6 @@ typedef struct _EJOB
     ULONG MemberLevel;
     ULONG JobFlags;
 } EJOB, *PEJOB;
-#include <poppack.h>
 
 //
 // Job Information Structures for NtQueryInformationJobObject

@@ -98,6 +98,9 @@ static const WCHAR* KEY_KBD = L"Control Panel\\Keyboard";
 static const WCHAR* VAL_KBDSPD = L"KeyboardSpeed";
 static const WCHAR* VAL_KBDDELAY = L"KeyboardDelay";
 
+static const WCHAR* KEY_INPUT_METHOD = L"Control Panel\\Input Method";
+// static const WCHAR* VAL_ENABLE_HEXNUMPAD = L"EnableHexNumpad";
+
 static const WCHAR* KEY_SHOWSNDS = L"Control Panel\\Accessibility\\ShowSounds";
 static const WCHAR* KEY_KDBPREF = L"Control Panel\\Accessibility\\Keyboard Preference";
 static const WCHAR* KEY_SCRREAD = L"Control Panel\\Accessibility\\Blind Access";
@@ -357,6 +360,9 @@ SpiUpdatePerUserSystemParameters(VOID)
         if (SPITESTPREF(UPM_COMBOBOXANIMATION)) gpsi->PUSIFlags |= PUSIF_COMBOBOXANIMATION;
         if (SPITESTPREF(UPM_LISTBOXSMOOTHSCROLLING)) gpsi->PUSIFlags |= PUSIF_LISTBOXSMOOTHSCROLLING;
     }
+
+    gbEnableHexNumpad = SpiLoadInt(KEY_INPUT_METHOD, L"EnableHexNumpad", FALSE);
+
     gdwLanguageToggleKey = UserGetLanguageToggle(L"Language Hotkey", 1);
     gdwLayoutToggleKey = UserGetLanguageToggle(L"Layout Hotkey", 2);
 }
@@ -1436,7 +1442,7 @@ SpiGetSet(UINT uiAction, UINT uiParam, PVOID pvParam, FLONG fl)
             return SpiSetInt(&gspv.iPwrOffTimeout, uiParam, KEY_DESKTOP, L"PowerOffTimeOut", fl);
 
         case SPI_GETLOWPOWERACTIVE:
-            return SpiGetInt(pvParam, &gspv.iPwrOffTimeout, fl);
+            return SpiGetInt(pvParam, &gspv.bLowPwrActive, fl);
 
         case SPI_GETPOWEROFFACTIVE:
             return SpiGetInt(pvParam, &gspv.bPwrOffActive, fl);

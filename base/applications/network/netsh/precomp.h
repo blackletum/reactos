@@ -5,8 +5,7 @@
  * COPYRIGHT:  Copyright 2023 Eric Kohl <eric.kohl@reactos.org>
  */
 
-#ifndef PRECOMP_H
-#define PRECOMP_H
+#pragma once
 
 /* INCLUDES ******************************************************************/
 
@@ -14,17 +13,16 @@
 #include <stdlib.h>
 #include <stdarg.h>
 
-#include <ndk/rtlfuncs.h>
-
 #define WIN32_NO_STATUS
 #include <windef.h>
 #include <winbase.h>
 #include <winreg.h>
 #include <wincon.h>
 #include <winuser.h>
+#include <iphlpapi.h>
 #include <iphlpapi_undoc.h>
 
-#include <errno.h>
+#include <ndk/rtlfuncs.h>
 
 #include <conutils.h>
 #include <netsh.h>
@@ -34,8 +32,6 @@
 
 
 /* DEFINES *******************************************************************/
-
-#define HUGE_BUFFER_SIZE  2048
 
 #define MAX_STRING_SIZE 1024
 #define MAX_ARGS_COUNT 256
@@ -74,8 +70,6 @@ typedef struct _HELPER_ENTRY
 
 } HELPER_ENTRY, *PHELPER_ENTRY;
 
-
-
 typedef struct _COMMAND_ENTRY
 {
     struct _COMMAND_ENTRY *pPrev;
@@ -86,6 +80,7 @@ typedef struct _COMMAND_ENTRY
     DWORD dwShortCmdHelpToken;
     DWORD dwCmdHlpToken;
     DWORD dwFlags;
+    PNS_OSVERSIONCHECK pfnOsVersionCheck;
 } COMMAND_ENTRY, *PCOMMAND_ENTRY;
 
 typedef struct _COMMAND_GROUP
@@ -96,6 +91,7 @@ typedef struct _COMMAND_GROUP
     PWSTR pwszCmdGroupToken;
     DWORD dwShortCmdHelpToken;
     DWORD dwFlags;
+    PNS_OSVERSIONCHECK pfnOsVersionCheck;
 
     PCOMMAND_ENTRY pCommandListHead;
     PCOMMAND_ENTRY pCommandListTail;
@@ -116,6 +112,7 @@ typedef struct _CONTEXT_ENTRY
     PNS_CONTEXT_COMMIT_FN pfnCommitFn;
     PNS_CONTEXT_DUMP_FN pfnDumpFn;
     PNS_CONTEXT_CONNECT_FN pfnConnectFn;
+    PNS_OSVERSIONCHECK pfnOsVersionCheck;
 
     PCOMMAND_ENTRY pCommandListHead;
     PCOMMAND_ENTRY pCommandListTail;
@@ -135,8 +132,17 @@ extern PCONTEXT_ENTRY pCurrentContext;
 
 extern PHELPER_ENTRY pHelperListHead;
 
-extern HMODULE hModule;
+extern HMODULE g_hModule;
 extern PWSTR pszMachine;
+
+extern UINT  VersionInfoArchitecture;
+extern UINT  VersionInfoOsProductSuite;
+extern UINT  VersionInfoOsType;
+extern UINT  VersionInfoVersion;
+extern WCHAR VersionInfoBuildNumber[MAX_PATH];
+extern WCHAR VersionInfoServicePackMajorVersion[MAX_PATH];
+extern WCHAR VersionInfoServicePackMinorVersion[MAX_PATH];
+
 
 /* PROTOTYPES *****************************************************************/
 
@@ -260,7 +266,6 @@ ShowHelperCommand(
     LPCVOID pvData,
     BOOL *pbDone);
 
-
 /* interpreter.c */
 
 DWORD
@@ -279,6 +284,9 @@ RunScript(
 LPWSTR
 MergeStrings(
     _In_ LPWSTR pszStringArray[],
-    _In_ INT nCount);
+    _In_ UINT nCount);
 
-#endif /* PRECOMP_H */
+/* wmi.c */
+
+HRESULT
+GetWmiVersionInfo(VOID);

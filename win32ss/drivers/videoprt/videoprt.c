@@ -89,7 +89,7 @@ IntVideoPortAddDeviceMapLink(
 
     /* Create a unicode device name. */
     DeviceNumber = DeviceExtension->DeviceNumber;
-    swprintf(DeviceBuffer, L"\\Device\\Video%lu", DeviceNumber);
+    _swprintf(DeviceBuffer, L"\\Device\\Video%lu", DeviceNumber);
 
     if (VideoPortUseNewKey)
         RegistryPath = &DeviceExtension->NewRegistryPath;
@@ -122,7 +122,7 @@ IntVideoPortAddDeviceMapLink(
     }
 
     /* Create symbolic link "\??\DISPLAYx" */
-    swprintf(SymlinkBuffer, L"\\??\\DISPLAY%lu", DeviceNumber + 1);
+    _swprintf(SymlinkBuffer, L"\\??\\DISPLAY%lu", DeviceNumber + 1);
     RtlInitUnicodeString(&SymlinkName, SymlinkBuffer);
     RtlInitUnicodeString(&DeviceName, DeviceBuffer);
     Status = IoCreateSymbolicLink(&SymlinkName, &DeviceName);
@@ -215,7 +215,7 @@ DPRINT1("%s(dro 0x%p, ext 0x%p, PDO 0x%p)\n", __FUNCTION__, DriverObject, Driver
      */
 
     /* Create a unicode device name. */
-    swprintf(DeviceBuffer, L"\\Device\\Video%lu", DeviceNumber);
+    _swprintf(DeviceBuffer, L"\\Device\\Video%lu", DeviceNumber);
     RtlInitUnicodeString(&DeviceName, DeviceBuffer);
 
     INFO_(VIDEOPRT, "HwDeviceExtension size is: 0x%x\n",
