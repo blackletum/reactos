@@ -62,6 +62,7 @@ list(APPEND SOURCE
     NtDuplicateToken.c
     NtFilterToken.c
     NtFreeVirtualMemory.c
+    NtGetCurrentProcessorNumberEx.c
     NtImpersonateAnonymousToken.c
     NtLoadUnloadKey.c
     NtMapViewOfSection.c
@@ -118,6 +119,7 @@ list(APPEND SOURCE
     RtlGetLongestNtPathLength.c
     RtlGetNtProductType.c
     RtlGetProcessHeaps.c
+    RtlGetProductInfo.c
     RtlGetUnloadEventTrace.c
     RtlHandle.c
     RtlImageDirectoryEntryToData.c
@@ -129,6 +131,8 @@ list(APPEND SOURCE
     RtlNtPathNameToDosPathName.c
     RtlpApplyLengthFunction.c
     RtlpEnsureBufferSize.c
+    RtlQueryEnvironmentVariable.c
+    RtlQueryEnvironmentVariable_U.c
     RtlQueryTimeZoneInfo.c
     RtlReAllocateHeap.c
     RtlRemovePrivileges.c

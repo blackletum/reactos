@@ -18,6 +18,10 @@ list(APPEND RTL_WINE_SOURCE
     timerqueue.c
     threadpool.c
 )
+list(APPEND RTL_WINE_SOURCE_VISTA
+    product.c
+    threadpool.c
+)
 set_source_files_properties(threadpool.c PROPERTIES COMPILE_DEFINITIONS __WINESRC__)
 
 if(MSVC)
@@ -66,6 +70,7 @@ list(APPEND SOURCE
     prefix.c
     priv.c
     process.c
+    processor.c
     propvar.c
     random.c
     rangelist.c
@@ -131,10 +136,14 @@ add_pch(rtl rtl.h SOURCE)
 add_dependencies(rtl psdk asm)
 
 list(APPEND SOURCE_VISTA
+    ${RTL_WINE_SOURCE_VISTA}
     condvar.c
     locale.c
+    processor.c
     runonce.c
+    slist.c
     srw.c
+    threadpool.c
     unicode_vista.c
     utf8.c)
 
