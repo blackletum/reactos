@@ -452,7 +452,7 @@ _main(IN INT argc,
       IN ULONG DebugFlag)
 {
     NTSTATUS Status;
-    KPRIORITY SetBasePriority;
+    //KPRIORITY SetBasePriority;
     ULONG_PTR Parameters[4];
     HANDLE Handles[2];
     PVOID State;
@@ -460,6 +460,7 @@ _main(IN INT argc,
     PROCESS_BASIC_INFORMATION ProcessInfo;
     UNICODE_STRING DbgString, InitialCommand;
 
+#if 0
     /* Make us critical */
     RtlSetProcessIsCritical(TRUE, NULL, FALSE);
     RtlSetThreadIsCritical(TRUE, NULL, FALSE);
@@ -471,6 +472,7 @@ _main(IN INT argc,
                                      (PVOID)&SetBasePriority,
                                      sizeof(SetBasePriority));
     ASSERT(NT_SUCCESS(Status));
+#endif
 
     /* Save the debug flag if it was passed */
     if (DebugFlag) SmpDebug = DebugFlag != 0;
@@ -480,8 +482,13 @@ _main(IN INT argc,
     Parameters[1] = Parameters[2] = Parameters[3] = 0;
 
     /* Enter SEH so we can terminate correctly if anything goes wrong */
+State = (PVOID)(ULONG_PTR)0xdeadbeef;
     _SEH2_TRY
     {
+__debugbreak();
+DbgBreakPoint();
+*(PULONG)State = 0xc0ffee;
+
         /* Initialize SMSS */
         Status = SmpInit(&InitialCommand, &Handles[0]);
         if (!NT_SUCCESS(Status))
