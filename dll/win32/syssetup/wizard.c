@@ -1315,80 +1315,161 @@ SetUserLocaleName(HWND hwnd)
 static VOID
 SetKeyboardLayoutName(HWND hwnd)
 {
-    HKL hkl;
-    BOOL LayoutSpecial = FALSE;
-    WCHAR LayoutPath[256];
-    WCHAR LocaleName[32];
-    WCHAR SpecialId[5] = L"";
-    WCHAR ResText[256] = L"";
-    DWORD dwValueSize;
     HKEY hKey;
-    UINT i;
+    LONG res;
+    DWORD dwSize, dwType;
+    WCHAR szKLID[KL_NAMELENGTH];
+    WCHAR LayoutName[128];
+    WCHAR LayoutPath[256];
+    WCHAR ResText[256] = L"";
 
-    /* Get the default input language and method */
-    if (!SystemParametersInfoW(SPI_GETDEFAULTINPUTLANG, 0, (LPDWORD)&hkl, 0))
-    {
+#if 1
+    WCHAR szLayoutId[KL_NAMELENGTH];
+
+// NOTE: The following disabled code is kept for references purposes.
+#if 0
+    /* Retrieve the default input language and method */
+    HKL hkl;
+    if (!SystemParametersInfoW(SPI_GETDEFAULTINPUTLANG, 0, &hkl, 0))
         hkl = GetKeyboardLayout(0);
-    }
 
+    /*
+     * Generate a hexadecimal identifier for keyboard layout registry key.
+     * HIWORD(hkl) indicates the layout ID used in practice, while LOWORD(hkl)
+     * indicates a LANGID, that may not correspond to any keyboard layout.
+     *
+     * For example:
+     * - English (Australia) using the U.S. layout, and we have:
+     *   LOWORD(hkl) == LANGID == 0x0C09, HIWORD(hkl) == 0x0409
+     *   No keyboard layout ID == 0x00000C09 exists; however 0x00000409
+     *   does exist.
+     * - English (Australia) using U.S. Dvorak left-handed:
+     *   LOWORD(hkl) == 0x0C09, but HIWORD(hkl) == 0xFyyy,
+     *   indicating the usage of a specific Layout Id to map to the
+     *   corresponding keyboard layout ID.
+     * - English (Australia) using Arabic (102) AZERTY layout:
+     *   LOWORD(hkl) == 0x0C09, but HIWORD(hkl) == 0x0401.
+     *   0x0401 or 0x0C09 can be the substituted layout for the one
+     *   really used, i.e. Arabic (102) AZERTY layout 0x00020401.
+     */
     if ((HIWORD(hkl) & 0xF000) == 0xF000)
     {
-        /* Process keyboard layout with special id */
-        StringCchPrintfW(SpecialId, ARRAYSIZE(SpecialId), L"%04x", (HIWORD(hkl) & 0x0FFF));
-        LayoutSpecial = TRUE;
-    }
+        UINT i;
+        WCHAR SpecialId[5];
 
-#define MAX_LAYOUTS_PER_LANGID 0x10000
-    for (i = 0; i < (LayoutSpecial ? MAX_LAYOUTS_PER_LANGID : 1); i++)
-    {
-        /* Generate a hexadecimal identifier for keyboard layout registry key */
-        StringCchPrintfW(LocaleName, ARRAYSIZE(LocaleName), L"%08lx", (i << 16) | LOWORD(hkl));
-
-        StringCchCopyW(LayoutPath, ARRAYSIZE(LayoutPath), L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts\\");
-        StringCchCatW(LayoutPath, ARRAYSIZE(LayoutPath), LocaleName);
-        *LocaleName = UNICODE_NULL;
+        /* Process keyboard layout with special ID */
+        StringCchPrintfW(SpecialId, _countof(SpecialId), L"%04x", (HIWORD(hkl) & 0x0FFF));
 
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE,
-                          LayoutPath,
-                          0,
-                          KEY_ALL_ACCESS,
-                          &hKey) == ERROR_SUCCESS)
+                          L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts",
+                          0, KEY_ENUMERATE_SUB_KEYS, &hKey) != ERROR_SUCCESS)
         {
-            /* Make sure the keyboard layout key we opened is the one we need.
-             * If the layout has no special id, just pass this check. */
-            dwValueSize = sizeof(LocaleName);
-            if (!LayoutSpecial ||
-                ((RegQueryValueExW(hKey,
-                                   L"Layout Id",
-                                   NULL,
-                                   NULL,
-                                   (PVOID)&LocaleName,
-                                   &dwValueSize) == ERROR_SUCCESS) &&
-                (wcscmp(LocaleName, SpecialId) == 0)))
+            /* We failed, just use the current layout ID as the string to display */
+            StringCchPrintfW(szKLID, _countof(szKLID), L"%08lx", HandleToUlong(hkl));
+            goto Skip;
+        }
+
+        /* Find the layout corresponding to this special ID */
+        for (i = 0; ; ++i, *szKLID = UNICODE_NULL)
+        {
+            HKEY hLayoutKey;
+
+            dwSize = _countof(szKLID);
+            if (RegEnumKeyExW(hKey, i, szKLID, &dwSize, NULL, NULL, NULL, NULL) != ERROR_SUCCESS)
             {
-                *LocaleName = UNICODE_NULL;
-                dwValueSize = sizeof(LocaleName);
-                RegQueryValueExW(hKey,
-                                 L"Layout Text",
-                                 NULL,
-                                 NULL,
-                                 (PVOID)&LocaleName,
-                                 &dwValueSize);
-                /* Let the loop know where to stop */
-                i = MAX_LAYOUTS_PER_LANGID;
+                *szKLID = UNICODE_NULL;
+                break;
             }
-            RegCloseKey(hKey);
+
+            if (RegOpenKeyExW(hKey, szKLID, 0, KEY_QUERY_VALUE, &hLayoutKey) != ERROR_SUCCESS)
+                continue;
+
+            /* Make sure the keyboard layout key we opened is the one we need.
+             * If the layout has no special ID, just skip it. */
+            dwSize = sizeof(szLayoutId); // OK, because sizeof(szLayoutId) > sizeof(SpecialId)
+            res = RegQueryValueExW(hLayoutKey, L"Layout Id", NULL, &dwType,
+                                   (PBYTE)szLayoutId, &dwSize);
+            RegCloseKey(hLayoutKey);
+
+            if ((res == ERROR_SUCCESS) && (dwType == REG_SZ) && (dwSize == sizeof(SpecialId)) &&
+                (_wcsicmp(szLayoutId, SpecialId) == 0))
+            {
+                break;
+            }
         }
-        else
-        {
-            /* Keyboard layout registry keys are expected to go in order without gaps */
-            break;
-        }
+
+        RegCloseKey(hKey);
     }
-#undef MAX_LAYOUTS_PER_LANGID
+    else
+    {
+        /* Generate a hexadecimal identifier for keyboard layout registry key,
+         * from HIWORD(hkl) indicating the layout ID used in practice */
+        StringCchPrintfW(szKLID, _countof(szKLID), L"%08lx", HIWORD(hkl));
+    }
+Skip:;
+
+#else
+    /* Retrieve the default keyboard layout ID */
+    *szKLID = UNICODE_NULL;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Keyboard Layout\\Preload",
+                      0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+    {
+        dwSize = sizeof(szKLID);
+        res = RegQueryValueExW(hKey, L"1", NULL, &dwType, (PBYTE)szKLID, &dwSize);
+        if ((res != ERROR_SUCCESS) || (dwType != REG_SZ) || (dwSize != sizeof(szKLID)))
+            *szKLID = UNICODE_NULL;
+        RegCloseKey(hKey);
+    }
+#endif
+
+    /* Fall back to U.S. layout if none was found */
+    if (!*szKLID)
+        wcscpy(szKLID, L"00000409");
+
+    /* If this is a substituted layout ID, replace it with the target ID */
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, L"Keyboard Layout\\Substitutes",
+                      0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+    {
+        dwSize = sizeof(szLayoutId);
+        res = RegQueryValueExW(hKey, szKLID, NULL, &dwType, (PBYTE)szLayoutId, &dwSize);
+        if ((res == ERROR_SUCCESS) && (dwType == REG_SZ) && (dwSize == sizeof(szKLID)))
+            wcscpy(szKLID, szLayoutId);
+        RegCloseKey(hKey);
+    }
+
+#else
+    /* Retrieve the active (for the current thread) keyboard layout ID;
+     * fall back to U.S. layout if none was found.
+     *
+     * NOTE: This methods always gives the *correct* KLID; however its
+     * drawbacks is that it works only for the active keyboard layout,
+     * not for an arbitrary one. */
+    if (!GetKeyboardLayoutNameW(szKLID))
+        wcscpy(szKLID, L"00000409");
+#endif
+
+    *LayoutName = UNICODE_NULL;
+
+    /* Open the layout ID registry key and retrieve its human-readable name */
+    StringCchPrintfW(LayoutPath, _countof(LayoutPath),
+                     L"SYSTEM\\CurrentControlSet\\Control\\Keyboard Layouts\\%s",
+                     szKLID);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, LayoutPath,
+                      0, KEY_QUERY_VALUE, &hKey) == ERROR_SUCCESS)
+    {
+        dwSize = sizeof(LayoutName);
+        res = RegQueryValueExW(hKey, L"Layout Text", NULL, &dwType, (PBYTE)LayoutName, &dwSize);
+        if ((res != ERROR_SUCCESS) || (dwType != REG_SZ))
+            *LayoutName = UNICODE_NULL;
+        RegCloseKey(hKey);
+    }
+
+    /* If no layout name was found, just display the current layout ID */
+    if (!*LayoutName)
+        wcscpy(LayoutName, szKLID);
 
     LoadStringW(hDllInstance, IDS_LAYOUTTEXT, ResText, ARRAYSIZE(ResText));
-    StringCchPrintfW(LayoutPath, ARRAYSIZE(LayoutPath), ResText, LocaleName);
+    StringCchPrintfW(LayoutPath, ARRAYSIZE(LayoutPath), ResText, LayoutName);
 
     SetWindowTextW(hwnd, LayoutPath);
 }
