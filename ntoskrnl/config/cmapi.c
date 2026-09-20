@@ -2028,6 +2028,7 @@ CmLoadKey(IN POBJECT_ATTRIBUTES TargetKey,
         /* Fail */
         DPRINT("Trusted classes not yet supported\n");
     }
+__debugbreak();
 
     /* Build a service QoS for a security context */
     ServiceQos.Length = sizeof(SECURITY_QUALITY_OF_SERVICE);
@@ -2215,6 +2216,7 @@ CmUnloadKey(
     HCELL_INDEX Cell;
 
     DPRINT("CmUnloadKey(%p, %lx)\n", Kcb, Flags);
+__debugbreak();
 
     /* Ensure the registry is locked exclusively for the calling thread */
     CMP_ASSERT_EXCLUSIVE_REGISTRY_LOCK();
@@ -2302,11 +2304,11 @@ CmUnloadKey(
     /* Release hive lock */
     CmpUnlockRegistry();
 
-    /* Close file handles */
-    CmpCloseHiveFiles(CmHive);
-
     /* Remove the hive from the hive file list */
     CmpRemoveFromHiveFileList(CmHive);
+
+    /* Close file handles */
+    CmpCloseHiveFiles(CmHive);
 
 /**
  ** NOTE:
