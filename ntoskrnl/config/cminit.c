@@ -166,6 +166,9 @@ CmpInitializeHive(
     /* Clear file names */
     RtlInitEmptyUnicodeString(&Hive->FileUserName, NULL, 0);
     RtlInitEmptyUnicodeString(&Hive->FileFullPath, NULL, 0);
+#if (NTDDI_VERSION >= NTDDI_VISTA) || defined(__REACTOS__)
+    RtlInitEmptyUnicodeString(&Hive->HiveRootPath, NULL, 0);
+#endif
 
     /* Initialize the view list */
     CmpInitHiveViewList(Hive);

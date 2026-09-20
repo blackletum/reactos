@@ -1,9 +1,8 @@
 /*
- * PROJECT:         ReactOS Kernel
- * LICENSE:         GPL - See COPYING in the top level directory
- * FILE:            ntoskrnl/config/cmhvlist.c
- * PURPOSE:         Configuration Manager - Hives file list management
- * PROGRAMMERS:     Hermes BELUSCA - MAITO
+ * PROJECT:     ReactOS Kernel
+ * LICENSE:     GPL-2.0-or-later (https://spdx.org/licenses/GPL-2.0-or-later)
+ * PURPOSE:     Configuration Manager - Hives file list management
+ * COPYRIGHT:   Copyright 2012-2026 Hermès Bélusca-Maïto <hermes.belusca-maito@reactos.org>
  */
 
 /* INCLUDES *******************************************************************/
@@ -130,7 +129,7 @@ CmpGetHiveName(
 NTSTATUS
 NTAPI
 CmpAddToHiveFileList(
-    _In_ PCMHIVE Hive)
+    _Inout_ PCMHIVE Hive)
 {
     NTSTATUS Status;
     OBJECT_ATTRIBUTES ObjectAttributes;
@@ -151,7 +150,7 @@ CmpAddToHiveFileList(
                                NULL,
                                NULL);
     Status = ZwCreateKey(&KeyHandle,
-                         KEY_READ | KEY_WRITE,
+                         KEY_SET_VALUE,
                          &ObjectAttributes,
                          0,
                          NULL,
@@ -164,7 +163,10 @@ CmpAddToHiveFileList(
         return Status;
     }
 
-    /* Retrieve the name of the hive */
+    /* Retrieve the hive path name.
+     * NOTE: On Vista+, the hive path is constructed in CmpLinkHiveToMaster().
+     * In ReactOS, its construction is instead deferred to this point, when
+     * the hive is added to the hive file list. */
     if (!CmpGetHiveName(Hive, &HivePath))
     {
         /* Fail */
@@ -238,16 +240,20 @@ CmpAddToHiveFileList(
         DPRINT1("CmpAddToHiveFileList: Setting of entry in the hive list failed (Status: 0x%08lx)\n", Status);
     }
 
+#if (NTDDI_VERSION >= NTDDI_VISTA) || defined(__REACTOS__)
+    /* Capture the constructed hive name, and reset our local buffer
+     * so it doesn't get freed on exit */
+    Hive->HiveRootPath = HivePath;
+    HivePath.Buffer = NULL;
+#endif
+
 Quickie:
     /* Cleanup and return status */
     if (HivePath.Buffer)
-    {
         ExFreePoolWithTag(HivePath.Buffer, TAG_CM);
-    }
     if (FileNameInfo)
-    {
         ExFreePoolWithTag(FileNameInfo, TAG_CM);
-    }
+
     ObCloseHandle(KeyHandle, KernelMode);
     return Status;
 }
@@ -255,12 +261,16 @@ Quickie:
 VOID
 NTAPI
 CmpRemoveFromHiveFileList(
-    _In_ PCMHIVE Hive)
+    _Inout_ PCMHIVE Hive)
 {
     NTSTATUS Status;
     OBJECT_ATTRIBUTES ObjectAttributes;
     HANDLE KeyHandle;
+#if (NTDDI_VERSION < NTDDI_VISTA) && !defined(__REACTOS__)
     UNICODE_STRING HivePath;
+#else
+    #define HivePath (Hive->HiveRootPath)
+#endif
 
     /* Open the hive list key */
     InitializeObjectAttributes(&ObjectAttributes,
@@ -269,7 +279,7 @@ CmpRemoveFromHiveFileList(
                                NULL,
                                NULL);
     Status = ZwOpenKey(&KeyHandle,
-                       KEY_READ | KEY_WRITE,
+                       KEY_SET_VALUE,
                        &ObjectAttributes);
     if (!NT_SUCCESS(Status))
     {
@@ -278,14 +288,20 @@ CmpRemoveFromHiveFileList(
         return;
     }
 
+#if (NTDDI_VERSION < NTDDI_VISTA) && !defined(__REACTOS__)
     /* Get the hive path name */
     CmpGetHiveName(Hive, &HivePath);
+#endif
 
     /* Delete the hive path name from the list */
     ZwDeleteValueKey(KeyHandle, &HivePath);
 
     /* Cleanup allocation and handle */
     ExFreePoolWithTag(HivePath.Buffer, TAG_CM);
+#if (NTDDI_VERSION >= NTDDI_VISTA) || defined(__REACTOS__)
+    RtlInitEmptyUnicodeString(&Hive->HiveRootPath, NULL, 0);
+#endif
+
     ObCloseHandle(KeyHandle, KernelMode);
 }
 
