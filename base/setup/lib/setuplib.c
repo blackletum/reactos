@@ -1145,6 +1145,13 @@ FinishSetup(
     SpInfCloseInfFile(pSetupData->SetupInf);
 }
 
+ULONG uTempLong = 0;
+VOID WaitForDebugging(VOID)
+{
+    while (InterlockedCompareExchange(&uTempLong, 0, 0) == 0)
+        NtYieldExecution();
+}
+
 /*
  * SIDEEFFECTS
  *  Calls RegInitializeRegistry
@@ -1173,6 +1180,7 @@ UpdateRegistry(
     BOOLEAN ShouldRepairRegistry = FALSE;
     BOOLEAN Delete;
 
+__debugbreak();
     if (RepairUpdateFlag)
     {
         DPRINT1("TODO: Updating / repairing the registry is not completely implemented yet!\n");
@@ -1388,6 +1396,7 @@ Cleanup:
     // and copy the created hive files into .sav files.
     //
     RegCleanupRegistry(&pSetupData->DestinationPath);
+WaitForDebugging();
 
     /*
      * Check whether we were in update/repair mode but we were actually

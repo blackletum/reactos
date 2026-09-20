@@ -16,6 +16,8 @@
 #define NDEBUG
 #include <debug.h>
 
+extern VOID WaitForDebugging(VOID);
+
 /* GLOBALS ******************************************************************/
 
 static UNICODE_STRING SymbolicLinkValueName =
@@ -461,6 +463,7 @@ VerifyRegistryHive(
 {
     NTSTATUS Status;
 
+__debugbreak();
     /* Try to mount the specified registry hive */
     Status = ConnectRegistry(NULL,
                              L"\\Registry\\Machine\\USetup_VerifyHive",
@@ -484,6 +487,7 @@ VerifyRegistryHive(
     if (Status == STATUS_REGISTRY_HIVE_RECOVERED) // NT_SUCCESS is still FALSE in this case!
         DPRINT1("VerifyRegistryHive: Registry hive %S was recovered but some data may be lost (Status 0x%08lx)\n", RegistryKey, Status);
 
+WaitForDebugging();
     if (!NT_SUCCESS(Status))
     {
         DPRINT1("VerifyRegistryHive: Registry hive %S is corrupted (Status 0x%08lx)\n", RegistryKey, Status);
@@ -502,6 +506,7 @@ VerifyRegistryHive(
         DPRINT1("DisconnectRegistry(%S) failed, Status 0x%08lx\n", RegistryKey, Status);
     }
 
+WaitForDebugging();
     return Status;
 }
 

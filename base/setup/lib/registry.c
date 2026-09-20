@@ -37,6 +37,7 @@
 #define NDEBUG
 #include <debug.h>
 
+extern VOID WaitForDebugging(VOID);
 
 // #ifdef __REACTOS__
 #if 1 // FIXME: Disable if setupapi.h is included in the code...
@@ -667,6 +668,7 @@ VerifyRegistryHives(
 
     /* Reset the status (we succeeded in checking all the hives) */
     Status = STATUS_SUCCESS;
+WaitForDebugging();
 
     /* Remove restore and backup privileges */
     RtlAdjustPrivilege(SE_BACKUP_PRIVILEGE, PrivilegeSet[1], FALSE, &PrivilegeSet[1]);
