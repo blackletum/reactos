@@ -14,15 +14,17 @@
 
 /* GLOBALS ********************************************************************/
 
-UNICODE_STRING HiveListValueName = RTL_CONSTANT_STRING(L"\\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Control\\hivelist");
+static UNICODE_STRING HiveListKeyName =
+    RTL_CONSTANT_STRING(L"\\REGISTRY\\MACHINE\\SYSTEM\\CurrentControlSet\\Control\\hivelist");
 
 /* FUNCTIONS ******************************************************************/
 
 /* Note: the caller is expected to free the HiveName string buffer */
+static
 BOOLEAN
-NTAPI
-CmpGetHiveName(IN PCMHIVE Hive,
-               OUT PUNICODE_STRING HiveName)
+CmpGetHiveName(
+    _In_ PCMHIVE Hive,
+    _Out_ PUNICODE_STRING HiveName)
 {
     HCELL_INDEX RootCell, LinkCell;
     PCELL_DATA RootData, LinkData, ParentData;
@@ -127,13 +129,14 @@ CmpGetHiveName(IN PCMHIVE Hive,
 
 NTSTATUS
 NTAPI
-CmpAddToHiveFileList(IN PCMHIVE Hive)
+CmpAddToHiveFileList(
+    _In_ PCMHIVE Hive)
 {
     NTSTATUS Status;
     OBJECT_ATTRIBUTES ObjectAttributes;
     HANDLE KeyHandle;
     UNICODE_STRING HivePath;
-    PWCHAR FilePath;
+    PWSTR FilePath;
     ULONG Length;
     OBJECT_NAME_INFORMATION DummyNameInfo;
     POBJECT_NAME_INFORMATION FileNameInfo;
@@ -143,7 +146,7 @@ CmpAddToHiveFileList(IN PCMHIVE Hive)
 
     /* Create or open the hive list key */
     InitializeObjectAttributes(&ObjectAttributes,
-                               &HiveListValueName,
+                               &HiveListKeyName,
                                OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
                                NULL,
                                NULL);
@@ -157,7 +160,7 @@ CmpAddToHiveFileList(IN PCMHIVE Hive)
     if (!NT_SUCCESS(Status))
     {
         /* Fail */
-        DPRINT1("CmpAddToHiveFileList: Creation or opening of the hive list failed, status = 0x%08lx\n", Status);
+        DPRINT1("CmpAddToHiveFileList: Creation or opening of the hive list failed (Status: 0x%08lx)\n", Status);
         return Status;
     }
 
@@ -181,7 +184,7 @@ CmpAddToHiveFileList(IN PCMHIVE Hive)
                                &Length);
         if (Status != STATUS_BUFFER_OVERFLOW)
         {
-            DPRINT1("CmpAddToHiveFileList: Hive file name size query failed, status = 0x%08lx\n", Status);
+            DPRINT1("CmpAddToHiveFileList: Hive file name size query failed (Status: 0x%08lx)\n", Status);
             goto Quickie;
         }
 
@@ -211,7 +214,7 @@ CmpAddToHiveFileList(IN PCMHIVE Hive)
         else
         {
             /* Fail */
-            DPRINT1("CmpAddToHiveFileList: Hive file name query failed, status = 0x%08lx\n", Status);
+            DPRINT1("CmpAddToHiveFileList: Hive file name query failed (Status: 0x%08lx)\n", Status);
             goto Quickie;
         }
     }
@@ -232,7 +235,7 @@ CmpAddToHiveFileList(IN PCMHIVE Hive)
     if (!NT_SUCCESS(Status))
     {
         /* Fail */
-        DPRINT1("CmpAddToHiveFileList: Setting of entry in the hive list failed, status = 0x%08lx\n", Status);
+        DPRINT1("CmpAddToHiveFileList: Setting of entry in the hive list failed (Status: 0x%08lx)\n", Status);
     }
 
 Quickie:
@@ -251,7 +254,8 @@ Quickie:
 
 VOID
 NTAPI
-CmpRemoveFromHiveFileList(IN PCMHIVE Hive)
+CmpRemoveFromHiveFileList(
+    _In_ PCMHIVE Hive)
 {
     NTSTATUS Status;
     OBJECT_ATTRIBUTES ObjectAttributes;
@@ -260,7 +264,7 @@ CmpRemoveFromHiveFileList(IN PCMHIVE Hive)
 
     /* Open the hive list key */
     InitializeObjectAttributes(&ObjectAttributes,
-                               &HiveListValueName,
+                               &HiveListKeyName,
                                OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE,
                                NULL,
                                NULL);
@@ -270,7 +274,7 @@ CmpRemoveFromHiveFileList(IN PCMHIVE Hive)
     if (!NT_SUCCESS(Status))
     {
         /* Fail */
-        DPRINT1("CmpRemoveFromHiveFileList: Opening of the hive list failed, status = 0x%08lx\n", Status);
+        DPRINT1("CmpRemoveFromHiveFileList: Opening of the hive list failed (Status: 0x%08lx)\n", Status);
         return;
     }
 
