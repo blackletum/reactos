@@ -1,8 +1,6 @@
 
 add_definitions(-D_MIDL_USE_GUIDDEF_)
 
-include_directories(${CMAKE_CURRENT_SOURCE_DIR})
-
 list(APPEND SOURCE
 #   access.idl
     activation.idl
@@ -74,6 +72,7 @@ list(APPEND SOURCE
     mimeinfo.idl
     mimeole.idl
     mlang.idl
+    mmc.idl
     mmdeviceapi.idl
     msaatext.idl
     mscoree.idl
@@ -169,6 +168,7 @@ add_custom_target(stdole2 DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/stdole2.tlb)
 add_idl_headers(d3d_idl_headers d3dcommon.idl)
 
 add_iid_library(adsiid iads.idl transact.idl)
+add_iid_library(mmc_uuids mmc.idl)
 add_iid_library(wuguid wuapi.idl)
 add_iid_library(xml_uuids msxml2.idl)
 
